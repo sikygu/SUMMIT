@@ -29,6 +29,7 @@ import org.evosuite.runtime.util.Inputs;
 import org.evosuite.setup.TestClusterUtils;
 import org.evosuite.testcase.execution.CodeUnderTestException;
 import org.evosuite.testcase.execution.Scope;
+import org.evosuite.testcase.llm.LLMService;
 import org.evosuite.testcase.statements.*;
 import org.evosuite.testcase.statements.environment.AccessedEnvironment;
 import org.evosuite.testcase.variable.*;
@@ -737,6 +738,165 @@ public class DefaultTestCase implements TestCase, Serializable {
                     + " at position " + position);
 
         return Randomness.choice(variables);
+    }
+
+    /* (non-Javadoc)
+     * @see org.evosuite.testcase.TestCase#getLLMSelectedObject(java.lang.reflect.Type, int)
+     */
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public VariableReference getLLMSelectedObject(Type type, int position)
+            throws ConstructionFailedException {
+        Inputs.checkNull(type);
+
+        List<VariableReference> variables = getObjects(type, position);
+        variables.removeIf(ref -> {
+            final Statement statement = this.getStatement(ref.getStPosition());
+            return ref instanceof NullReference || statement instanceof FunctionalMockStatement;
+        });
+
+        if (variables.isEmpty()) {
+            throw new ConstructionFailedException("Found no variables of type " + type
+                    + " at position " + position);
+        }
+
+        // Use LLM service to select the most appropriate object
+        LLMService llmService = LLMService.getInstance();
+        String context = buildSelectionContext(type, position, variables);
+
+        int maxRetries = 3;  // 最大重试次数
+        int currentRetry = 0;
+        Exception lastException = null;
+
+        while (currentRetry < maxRetries) {
+            try {
+                String selectedIndex = llmService.queryLLM(context);
+
+                // 尝试解析返回值，去除所有非数字字符
+                String cleanedIndex = selectedIndex.replaceAll("[^0-9]", "").trim();
+                if (cleanedIndex.isEmpty()) {
+                    logger.debug("LLM returned no valid index on attempt {}, response: {}",
+                            currentRetry + 1, selectedIndex);
+                    currentRetry++;
+                    continue;
+                }
+
+                int index = Integer.parseInt(cleanedIndex);
+
+                // 验证索引的有效性
+                if (index >= 0 && index < variables.size()) {
+                    logger.debug("LLM successfully selected index {} on attempt {}",
+                            index, currentRetry + 1);
+                    return variables.get(index);
+                } else {
+                    logger.debug("LLM returned invalid index {} on attempt {}, valid range: [0, {}]",
+                            index, currentRetry + 1, variables.size() - 1);
+                }
+
+            } catch (Exception e) {
+                lastException = e;
+                logger.debug("LLM selection failed on attempt {}: {}",
+                        currentRetry + 1, e.getMessage());
+            }
+
+            currentRetry++;
+            if (currentRetry < maxRetries) {
+                try {
+                    // 在重试之间添加短暂延迟，避免过于频繁的请求
+                    Thread.sleep(100L * currentRetry);  // 递增延迟
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        // 所有重试都失败后，记录详细错误信息并回退到随机选择
+        if (lastException != null) {
+            logger.warn("All {} LLM selection attempts failed, falling back to random selection. Last error: {}",
+                    maxRetries, lastException.getMessage());
+        } else {
+            logger.warn("All {} LLM selection attempts failed to produce valid index, falling back to random selection",
+                    maxRetries);
+        }
+
+        return Randomness.choice(variables);
+    }
+
+    /**
+     * Build context information for LLM to make selection
+     */
+    private String buildSelectionContext(Type type, int position, List<VariableReference> variables) {
+        StringBuilder context = new StringBuilder();
+        context.append("Task: Select the most appropriate variable for testing.\n\n");
+
+        // 解释测试用例的执行模型
+        context.append("=== Test Case Execution Model ===\n");
+        context.append("A test case is a sequence of statements that are executed in order.\n");
+        context.append("Each statement can only use variables defined in previous statements.\n");
+        context.append("Current statement position: ").append(position).append("\n");
+        context.append("Total statements in test: ").append(size()).append("\n\n");
+
+        // 解释变量依赖关系
+        context.append("=== Variable Dependencies ===\n");
+        context.append("We need a variable of type: ").append(type).append("\n");
+        context.append("This variable will be used at position: ").append(position).append("\n");
+        context.append("Only variables declared before position ").append(position)
+                .append(" can be used, to maintain proper initialization order.\n\n");
+
+        // 可用变量列表
+        context.append("=== Available Variables ===\n");
+        for (int i = 0; i < variables.size(); i++) {
+            VariableReference ref = variables.get(i);
+            Statement stmt = this.getStatement(ref.getStPosition());
+
+            context.append("\nVariable #").append(i).append(":\n");
+            // 声明位置
+            context.append("- Declared at position: ").append(ref.getStPosition()).append("\n");
+            // 与使用位置的距离（越近越好）
+            context.append("- Statements between declaration and usage: ")
+                    .append(position - ref.getStPosition()).append("\n");
+
+            // 变量的代码表示
+            context.append("- Declaration: ").append(stmt.getCode()).append("\n");
+
+            // 变量的使用情况
+            Set<VariableReference> deps = stmt.getVariableReferences();
+            if (!deps.isEmpty()) {
+                context.append("- Dependencies: ");
+                for (VariableReference dep : deps) {
+                    if (dep != ref) {
+                        context.append("var").append(dep.getStPosition()).append(" ");
+                    }
+                }
+                context.append("\n");
+            }
+
+            // 语句类型信息
+            if (stmt instanceof MethodStatement) {
+                MethodStatement methodStmt = (MethodStatement) stmt;
+                context.append("- Method call: ").append(methodStmt.getMethodName())
+                        .append(" from ").append(methodStmt.getDeclaringClassName()).append("\n");
+            } else if (stmt instanceof ConstructorStatement) {
+                ConstructorStatement ctorStmt = (ConstructorStatement) stmt;
+                context.append("- Constructor of: ").append(ctorStmt.getDeclaringClassName()).append("\n");
+            }
+        }
+
+        // 选择指导
+        context.append("\n=== Selection Guidelines ===\n");
+        context.append("1. MUST choose a variable declared before position ").append(position).append("\n");
+        context.append("2. Prefer variables declared closer to position ").append(position)
+                .append(" to minimize the scope\n");
+        context.append("3. Prefer variables with fewer dependencies\n");
+        context.append("4. Prefer variables that are directly of type ").append(type)
+                .append(" over those requiring type conversion\n");
+
+        context.append("\nReturn **only the index number** of the most appropriate variable based on the above guidelines.");
+        return context.toString();
     }
 
     /* (non-Javadoc)

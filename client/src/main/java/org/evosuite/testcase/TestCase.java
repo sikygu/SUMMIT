@@ -257,6 +257,17 @@ public interface TestCase extends Iterable<Statement>, Cloneable, Listenable<Voi
             throws ConstructionFailedException;
 
     /**
+     * Get a non-null object of the specified type using LLM-based selection
+     *
+     * @param type     The type of the object to select
+     * @param position The position in the test case up to which we search
+     * @return Reference to the selected variable
+     * @throws ConstructionFailedException if no such object exists
+     */
+    VariableReference getLLMSelectedObject(Type type, int position)
+            throws ConstructionFailedException;
+
+    /**
      * Get a random object matching type
      *
      * @return Random object

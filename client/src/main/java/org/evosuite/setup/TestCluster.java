@@ -1271,6 +1271,71 @@ public class TestCluster {
     }
 
 
+    /**
+     * Get random uncovered method or constructor of unit under test
+     *
+     * @param test Current test case
+     * @return An uncovered test call, or null if all calls are covered
+     * @throws ConstructionFailedException
+     */
+    public GenericAccessibleObject<?> getRandomUncoveredTestCall(TestCase test)
+            throws ConstructionFailedException {
+
+        // Get all candidate test methods
+        List<GenericAccessibleObject<?>> candidateTestMethods = new ArrayList<>(testMethods);
+
+        // Filter out covered methods
+        candidateTestMethods.removeIf(call -> {
+            String methodKey = getKey(call);
+            return Archive.getArchiveInstance().getNumOfRemainingTargets(methodKey) == 0;
+        });
+
+        if (candidateTestMethods.isEmpty()) {
+            logger.debug("No uncovered calls left, use getRandomTestCall instead");
+            return getRandomTestCall(test);
+        }
+
+        // If test already has a SUT call, remove all constructors
+        if (doesTestHaveSUTInstance(test)) {
+            candidateTestMethods = filterConstructors(candidateTestMethods);
+            // If only constructors remain, restore the full list
+            if (candidateTestMethods.isEmpty())
+                candidateTestMethods = new ArrayList<>(testMethods);
+        }
+
+        if (Properties.SORT_CALLS) {
+            candidateTestMethods = sortCalls(candidateTestMethods);
+        }
+
+        // Select a random uncovered call
+        GenericAccessibleObject<?> choice = Properties.SORT_CALLS ?
+                ListUtil.selectRankBiased(candidateTestMethods) :
+                Randomness.choice(candidateTestMethods);
+
+        logger.debug("Chosen uncovered call: " + choice);
+
+        // Handle generic types
+        if (choice.getOwnerClass().hasWildcardOrTypeVariables()) {
+            GenericClass<?> concreteClass = choice.getOwnerClass().getGenericInstantiation();
+            logger.debug("Concrete class is: " + concreteClass.getTypeName());
+            choice = choice.copyWithNewOwner(concreteClass);
+            logger.debug("Concrete class is: " + choice.getOwnerClass().getTypeName());
+            logger.debug("Type variables: " + choice.getOwnerClass().getTypeVariableMap());
+            logger.debug(Arrays.asList(choice.getTypeParameters()).toString());
+            logger.debug("Chosen call with generic parameter set: " + choice);
+            logger.debug("Call owner type: " + choice.getOwnerClass().getTypeName());
+        }
+
+        if (choice.hasTypeParameters()) {
+            logger.debug("Instantiating chosen call: " + choice);
+            choice = choice.getGenericInstantiation();
+            logger.debug("Chosen instantiation: " + choice);
+        }
+
+        return choice;
+    }
+
+
     public int getNumTestCalls() {
         return testMethods.size();
     }

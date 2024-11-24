@@ -34,6 +34,7 @@ import org.evosuite.seeding.ObjectPoolManager;
 import org.evosuite.setup.TestCluster;
 import org.evosuite.setup.TestClusterGenerator;
 import org.evosuite.setup.TestUsageChecker;
+import org.evosuite.testcase.mutation.LLMInsertion;
 import org.evosuite.testcase.mutation.RandomInsertion;
 import org.evosuite.testcase.statements.*;
 import org.evosuite.testcase.statements.environment.EnvironmentStatements;
@@ -2163,6 +2164,11 @@ public class TestFactory {
     }
 
 
+    public int insertLLMGuidedCallOnEnvironment(TestCase test, int lastValidPosition) {
+        return 0;
+    }
+
+
     /**
      * Inserts a random call for the UUT into the given {@code test} at the specified {@code
      * position}. Returns {@code true} on success, {@code false} otherwise.
@@ -2263,6 +2269,90 @@ public class TestFactory {
         }
     }
 
+
+    public boolean insertLLMGuidedCall(TestCase test, int position) {
+        int previousLength = test.size();
+        String name = "";
+        currentRecursion.clear();
+        logger.debug("Inserting LLM-guided call at position {}", position);
+        try {
+            if (reflectionFactory == null) {
+                final Class<?> targetClass = Properties.getTargetClassAndDontInitialise();
+                reflectionFactory = new ReflectionFactory(targetClass);
+            }
+
+            if (reflectionFactory.hasPrivateFieldsOrMethods() &&
+                    TimeController.getInstance().getPhasePercentage() >= Properties.REFLECTION_START_PERCENT &&
+                    (Randomness.nextDouble() < Properties.P_REFLECTION_ON_PRIVATE || TestCluster.getInstance().getNumTestCalls() == 0)) {
+                logger.debug("Going to insert random reflection call");
+                return insertRandomReflectionCall(test, position, 0);
+            }
+            GenericAccessibleObject<?> o = TestCluster.getInstance().getRandomUncoveredTestCall(test);
+            if (o == null) {
+                logger.warn("Have no target methods to test");
+                return false;
+            } else if (o.isConstructor()) {
+                GenericConstructor c = (GenericConstructor) o;
+                logger.debug("Adding constructor call {}", c.getName());
+                name = c.getName();
+                addConstructor(test, c, position, 0);
+            } else if (o.isMethod()) {
+                GenericMethod m = (GenericMethod) o;
+                logger.debug("Adding method call {}", m.getName());
+                name = m.getName();
+
+                if (!m.isStatic()) {
+                    logger.debug("Getting callee of type {}", m.getOwnerClass().getTypeName());
+                    VariableReference callee = null;
+                    Type target = m.getOwnerType();
+
+                    if (!test.hasObject(target, position)) {
+                        callee = createObject(test, target, position, 0, null, false, false, true);
+                        position += test.size() - previousLength;
+                        previousLength = test.size();
+                    } else {
+                        callee = test.getLLMSelectedObject(target, position);
+                    }
+                    logger.debug("Got callee of type {}", callee.getGenericClass().getTypeName());
+                    if (!TestUsageChecker.canUse(m.getMethod(), callee.getVariableClass())) {
+                        logger.debug("Cannot call method {} with callee of type {}", m, callee.getClassName());
+                        throw new ConstructionFailedException("Cannot apply method to this callee");
+                    }
+
+                    addMethodFor(test, callee, m.copyWithNewOwner(callee.getGenericClass()), position);
+                } else {
+                    addMethod(test, m, position, 0);
+                }
+            } else if (o.isField()) {
+                GenericField f = (GenericField) o;
+                name = f.getName();
+                logger.debug("Adding field {}", f.getName());
+                if (Randomness.nextBoolean()) {
+                    addFieldAssignment(test, f, position, 0);
+                } else {
+                    addField(test, f, position, 0);
+                }
+            } else {
+                logger.error("Got type other than method or constructor!");
+                return false;
+            }
+            return true;
+        } catch (ConstructionFailedException e) {
+            logger.debug("Inserting statement {} has failed. Removing statements: {}", name, e);
+
+            int lengthDifference = test.size() - previousLength;
+            for (int i = lengthDifference - 1; i >= 0; i--) {
+                //we need to remove them in order, so that the testcase is at all time consistent
+                if (logger.isDebugEnabled()) {
+                    logger.debug("  Removing statement: " + test.getStatement(position + i).getCode());
+                }
+                test.remove(position + i);
+            }
+            return false;
+        }
+    }
+
+
     /**
      * Within the given {@code test} case, inserts a random call at the specified {@code position}
      * on the object referenced by {@code var}. Returns {@code true} if the operation was successful
@@ -2352,6 +2442,11 @@ public class TestFactory {
         return rs.insertStatement(test, lastPosition);
     }
 
+    public int insertLLMGuidedStatement(TestCase test, int lastPosition) {
+        LLMInsertion llm = new LLMInsertion();
+        return llm.insertStatement(test, lastPosition);
+    }
+
     /**
      * Satisfies a list of parameters by reusing or creating variables. Returns a list of references
      * to the objects or values . If there are no parameters, simply returns the empty list. If
@@ -2435,6 +2530,4 @@ public class TestFactory {
         logger.debug("Satisfied {} parameters", parameterTypes.size());
         return parameters;
     }
-
-
 }
