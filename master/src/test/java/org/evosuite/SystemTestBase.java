@@ -106,6 +106,8 @@ public class SystemTestBase {
 
         Properties.getInstance().resetToDefaults();
 
+        Properties.ALGORITHM = Properties.Algorithm.MONOTONIC_GA;
+        Properties.STRATEGY = Properties.Strategy.EVOSUITE;
         Properties.IS_RUNNING_A_SYSTEM_TEST = true;
         RuntimeInstrumentation.setAvoidInstrumentingShadedClasses(true);
 
@@ -136,31 +138,11 @@ public class SystemTestBase {
 
         //change seed every month
         long seed = new GregorianCalendar().get(Calendar.MONTH);
-//		long seed = getSeed();
         Randomness.setSeed(seed);
 
         currentProperties = (java.util.Properties) System.getProperties().clone();
 
         MockFramework.enable();
-    }
-
-
-    /**
-     * Choose seed based on current month. If a test is re-run, then look at the
-     * next month, and so on in a %12 ring
-     *
-     * @return
-     */
-    private long getSeed() {
-
-        String id = this.getClass().getName() + "#" + name.getMethodName();
-        int counter = executionCounter.computeIfAbsent(id, c -> 0);
-
-        int month = (counter + new GregorianCalendar().get(Calendar.MONTH)) % 12;
-
-        executionCounter.put(id, counter + 1);
-
-        return month;
     }
 
 
