@@ -79,8 +79,8 @@ public class RegressionSystemTest extends SystemTestBase {
         System.out.println(best.toString());
         // TODO: Need to fix the check, some reset is not working
         int goals = TestGenerationStrategy.getFitnessFactories().get(0).getCoverageGoals().size(); // assuming single fitness function
-        Assert.assertEquals(numGoals, goals);
-        Assert.assertEquals("Wrong number of target goals", numGoals,
+        Assert.assertEquals("Wrong number of target goals", numGoals, goals);
+        Assert.assertEquals("Wrong number of covered goals", numGoals,
                 best.getNumOfCoveredGoals());
         Assert.assertEquals("Non-optimal coverage: ", 1d, best.getCoverage(), 0.001);
         Assert.assertEquals("Wrong fitness: ", 0.0, best.getFitness(), 0.00);
