@@ -35,14 +35,13 @@ import java.util.stream.Collectors;
 public class Prioritization<T> {
     private static final Logger logger = LoggerFactory.getLogger(Prioritization.class);
 
-    // The actual elements
-    private final TreeSet<T> elements;
-    // The priorities of the elements.
     private final Map<T, Integer> priorities = new HashMap<>();
+
+    private Comparator<T> comparator;
 
     /**
      * Initialize the priority collection with a {@param baseComparator}.
-     * This comparator is extended with an comparator that compares the priorities of the elements, if the
+     * This comparator is extended with a comparator that compares the priorities of the elements, if the
      * base comparator is undecided.
      * <p>
      * For details on the sorting see {@link TreeSet#TreeSet(Comparator)}.
@@ -55,7 +54,7 @@ public class Prioritization<T> {
 
     /**
      * Initialize the priority collection with a {@param baseComparator}.
-     * This comparator is extended with an comparator that compares the priorities of the elements, if the
+     * This comparator is extended with a comparator that compares the priorities of the elements, if the
      * base comparator is undecided.
      * <p>
      * For details on the sorting see {@link TreeSet#TreeSet(Comparator)}.
@@ -64,9 +63,8 @@ public class Prioritization<T> {
      * @param reversed       reverse the comparator before initializing the SortedSet.
      */
     public Prioritization(Comparator<T> baseComparator, boolean reversed) {
-        Comparator<T> comparator = baseComparator.thenComparingInt(this::getPriority);
+        comparator = baseComparator.thenComparingInt(this::getPriority);
         if (reversed) comparator = comparator.reversed();
-        elements = new TreeSet<>(comparator);
     }
 
     /**
@@ -77,8 +75,6 @@ public class Prioritization<T> {
      */
     public void add(T element, int priority) {
         priorities.put(element, priority);
-        elements.remove(element);
-        elements.add(element);
     }
 
     /**
@@ -89,10 +85,6 @@ public class Prioritization<T> {
      */
     public void addAll(Map<T, Integer> elements) {
         priorities.putAll(elements);
-        Set<T> keySet = elements.keySet();
-        // First remove it, so
-        this.elements.removeAll(keySet);
-        this.elements.addAll(keySet);
     }
 
     /**
@@ -101,7 +93,7 @@ public class Prioritization<T> {
      * @return an (ordered) list.
      */
     public List<T> toSortedList() {
-        return new ArrayList<>(elements);
+        return priorities.keySet().stream().sorted(comparator).collect(Collectors.toList());
     }
 
     /**
@@ -110,7 +102,7 @@ public class Prioritization<T> {
      * @return an (ordered) list.
      */
     public List<T> toSortedList(Predicate<T> filter) {
-        return elements.stream().filter(filter).collect(Collectors.toList());
+        return priorities.keySet().stream().filter(filter).sorted(comparator).collect(Collectors.toList());
     }
 
     /**
@@ -120,7 +112,7 @@ public class Prioritization<T> {
      * @return Whether at least one element has been found.
      */
     public boolean anyMatch(Predicate<T> matcher) {
-        return elements.stream().anyMatch(matcher);
+        return priorities.keySet().stream().anyMatch(matcher);
     }
 
     /**
@@ -139,14 +131,13 @@ public class Prioritization<T> {
      * @return view of all the elements in the priority collection
      */
     public Set<T> getElements() {
-        return Collections.unmodifiableSet(elements);
+        return Collections.unmodifiableSet(priorities.keySet());
     }
 
     /**
      * clears this collection
      */
     public void clear() {
-        elements.clear();
         priorities.clear();
     }
 }

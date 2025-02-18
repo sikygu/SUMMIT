@@ -33,18 +33,18 @@ import com.examples.with.different.packagename.staticfield.StaticFoo;
 
 public class ResetStaticFieldSystemTest extends SystemTestBase {
 
-    private boolean reset_statick_field__property;
+    private boolean reset_static_field__property;
 
     @Before
     public void saveProperties() {
-        reset_statick_field__property = Properties.RESET_STATIC_FIELDS;
+        reset_static_field__property = Properties.RESET_STATIC_FIELDS;
         Properties.RESET_STATIC_FIELDS = true;
         Properties.RESET_STATIC_FIELD_GETS = true;
     }
 
     @After
     public void restoreProperties() {
-        Properties.RESET_STATIC_FIELDS = reset_statick_field__property;
+        Properties.RESET_STATIC_FIELDS = reset_static_field__property;
     }
 
     @Test
