@@ -11,13 +11,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * An adapter that allows the Mogul algorithm to be used in contexts where
+ * An adapter that allows the SUMMIT algorithm to be used in contexts where
  * {@code TestSuiteChromosome}s are expected instead of {@code TestChromosome}s.
  */
-public class MogulTestSuiteAdapter extends MOSATestSuiteAdapter {
+public class SummitTestSuiteAdapter extends MOSATestSuiteAdapter {
     private static final long serialVersionUID = 3297246957849185819L;
 
-    public MogulTestSuiteAdapter(final Mogul algorithm) {
+    public SummitTestSuiteAdapter(final Summit algorithm) {
         super(algorithm);
     }
 

@@ -1,8 +1,8 @@
 # SUMMIT
 
-This fork of EvoSuite extends the original tool with the MOGUL algorithm for test generation.
+This fork of EvoSuite extends the original tool with the SUMMIT algorithm for test generation.
 
-## Using MOGUL
+## Using SUMMIT
 
 1. Create a `src/main/resources/llm.properties` file with your API configuration:
    ```properties
@@ -15,9 +15,9 @@ This fork of EvoSuite extends the original tool with the MOGUL algorithm for tes
 
 2. Build and install the project using Maven.
 
-3. To use the MOGUL algorithm, simply specify it with the `-Dalgorithm=MOGUL` parameter when running EvoSuite:
+3. To use the SUMMIT algorithm, simply specify it with the `-Dalgorithm=SUMMIT` parameter when running EvoSuite:
    ```
-   mvn -Dalgorithm=MOGUL evosuite:generate evosuite:export
+   mvn -Dalgorithm=SUMMIT evosuite:generate evosuite:export
    ```
 
 ---

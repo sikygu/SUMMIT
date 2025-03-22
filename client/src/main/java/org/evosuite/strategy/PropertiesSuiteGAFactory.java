@@ -60,9 +60,8 @@ import org.evosuite.testsuite.secondaryobjectives.TestSuiteSecondaryObjective;
 import org.evosuite.utils.ArrayUtil;
 import org.evosuite.utils.ResourceController;
 import sun.misc.Signal;
-import org.evosuite.ga.metaheuristics.Mogul;
-import org.evosuite.testcase.factories.LLMBasedTestFactory;
-import org.evosuite.ga.metaheuristics.MogulTestSuiteAdapter;
+import org.evosuite.ga.metaheuristics.Summit;
+import org.evosuite.ga.metaheuristics.SummitTestSuiteAdapter;
 
 /**
  * Factory for GA on test suites
@@ -211,15 +210,15 @@ public class PropertiesSuiteGAFactory
                     logger.info("Using a default factory that creates tests with variable length");
                     return new MIOTestSuiteAdapter(new MIO(new RandomLengthTestFactory()));
                 }
-            case MOGUL:
-                logger.info("Chosen search algorithm: MOGUL");
+            case SUMMIT:
+                logger.info("Chosen search algorithm: SUMMIT");
                 if (factory instanceof TestSuiteChromosomeFactory) {
                     final TestSuiteChromosomeFactory tscf = (TestSuiteChromosomeFactory) factory;
-                    return new MogulTestSuiteAdapter(new Mogul(tscf.getTestChromosomeFactory()));
+                    return new SummitTestSuiteAdapter(new Summit(tscf.getTestChromosomeFactory()));
                 } else {
                     logger.info("No specific factory for test cases given...");
                     logger.info("Using a default factory that creates tests with variable length");
-                    return new MogulTestSuiteAdapter(new Mogul(new RandomLengthTestFactory()));
+                    return new SummitTestSuiteAdapter(new Summit(new RandomLengthTestFactory()));
                 }
             case STANDARD_CHEMICAL_REACTION:
                 logger.info("Chosen search algorithm: Standard Chemical Reaction Optimization");

@@ -17,12 +17,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Implementation of the Mogul (Many Independent Objective
- * based Generation Unit Test with Large Language Model) algorithm
+ * Implementation of the SUMMIT algorithm
  */
-public class Mogul extends AbstractMOSA {
+public class Summit extends AbstractMOSA {
 
-    private static final Logger logger = LoggerFactory.getLogger(Mogul.class);
+    private static final Logger logger = LoggerFactory.getLogger(Summit.class);
 
     private final ChromosomeFactory<TestChromosome> llmFactory = new LLMBasedTestFactory();
 
@@ -37,7 +36,7 @@ public class Mogul extends AbstractMOSA {
      *
      * @param factory a {@link org.evosuite.ga.ChromosomeFactory} object.
      */
-    public Mogul(ChromosomeFactory<TestChromosome> factory) {
+    public Summit(ChromosomeFactory<TestChromosome> factory) {
         super(factory);
     }
 
@@ -47,11 +46,11 @@ public class Mogul extends AbstractMOSA {
     @Override
     protected void evolve() {
 
-        // From the second step on, Mogul will decide to either sample a new test using LLM
+        // From the second step on, SUMMIT will decide to either sample a new test using LLM
         // (probability Pr), or will choose one existing test in the archive (probability
         // 1 - Pr), copy it, and mutate it.
         //
-        // Note: in Mogul there is an extra parameter m which controls how many mutations and
+        // Note: in SUMMIT there is an extra parameter m which controls how many mutations and
         // fitness evaluations should be done on the same individual before sampling a new
         // one.
 
